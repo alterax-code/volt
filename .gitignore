@@ -1,0 +1,14 @@
+/target
+Cargo.lock
+**/*.rs.bk
+*.pdb
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+tests/programs/output.csv
+tests/programs/test_*.txt
+tests/programs/data.txt
+setup-*.ps1
