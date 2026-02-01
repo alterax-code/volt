@@ -7,8 +7,15 @@ Cargo.lock
 *.so
 *.dylib
 
+# Setup scripts
+setup-*.ps1
+
+# Temp files
+data.txt
+test_output.txt
+*.tmp
+
 # Test artifacts
 tests/programs/output.csv
 tests/programs/test_*.txt
 tests/programs/data.txt
-setup-*.ps1

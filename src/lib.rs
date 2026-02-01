@@ -27,7 +27,6 @@
 pub mod lexer;
 pub mod parser;
 pub mod vm;
-mod interpreter;
 
 use std::path::Path;
 use std::collections::HashSet;

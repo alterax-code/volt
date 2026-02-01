@@ -1,1 +1,0 @@
-// Interpreter values (deprecated â€” replaced by VM NaN-boxing)
