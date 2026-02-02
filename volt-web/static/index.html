@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOLT Playground</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9889;</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0b0f19;--surface:#111827;--surface2:#1a2234;
+  --border:#1f2937;--text:#e2e8f0;--dim:#64748b;
+  --accent:#f59e0b;--accent2:#fbbf24;
+  --green:#22c55e;--red:#ef4444;
+  --mono:'Cascadia Code','JetBrains Mono','Fira Code',Consolas,monospace;
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--text);height:100vh;overflow:hidden;
+}
+.app{display:grid;grid-template-rows:56px 1fr 36px;height:100vh}
+
+header{
+  display:flex;align-items:center;padding:0 20px;gap:16px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+}
+.logo{font-size:20px;font-weight:700;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.logo span{color:var(--accent)}
+
+select{
+  padding:6px 12px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);font-size:13px;cursor:pointer;outline:none;
+}
+select:hover{border-color:var(--accent)}
+
+.run-btn{
+  padding:7px 20px;background:var(--accent);color:#000;border:none;border-radius:6px;
+  font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;
+  transition:all .15s;
+}
+.run-btn:hover{background:var(--accent2);transform:translateY(-1px)}
+.run-btn:active{transform:translateY(0)}
+.run-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+
+.shortcut{font-size:11px;color:var(--dim);margin-left:auto;white-space:nowrap}
+
+main{display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
+.panel{display:flex;flex-direction:column;overflow:hidden}
+.panel:first-child{border-right:1px solid var(--border)}
+.panel-hdr{
+  padding:8px 16px;font-size:11px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--dim);background:var(--surface);
+  border-bottom:1px solid var(--border);
+}
+
+textarea{
+  flex:1;padding:16px;background:var(--bg);color:var(--text);border:none;outline:none;
+  font-family:var(--mono);font-size:14px;line-height:1.6;resize:none;tab-size:4;
+}
+textarea::placeholder{color:var(--dim)}
+
+.output{
+  flex:1;padding:16px;background:var(--bg);font-family:var(--mono);
+  font-size:13px;line-height:1.6;overflow-y:auto;white-space:pre-wrap;word-break:break-word;
+}
+.output.ok{color:var(--green)}
+.output.err{color:var(--red)}
+.output.idle{color:var(--dim);font-style:italic}
+
+footer{
+  display:flex;align-items:center;justify-content:space-between;padding:0 16px;
+  background:var(--surface);border-top:1px solid var(--border);font-size:12px;color:var(--dim);
+}
+.timing{color:var(--accent);font-weight:600}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.spin{animation:pulse .8s infinite}
+
+@media(max-width:768px){
+  main{grid-template-columns:1fr;grid-template-rows:1fr 1fr}
+  .panel:first-child{border-right:none;border-bottom:1px solid var(--border)}
+  .shortcut{display:none}
+}
+
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--dim)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+const {useState, useEffect, useRef, useCallback} = React;
+
+const EXAMPLES = [
+  {name: "Hello World", code: `print("Hello, World!")
+
+name := "VOLT"
+print(f"Welcome to {name}!")
+print(f"2 + 2 = {2 + 2}")`},
+
+  {name: "Fibonacci", code: `fn fib(n)
+    if n < 2
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+for i in 0..15
+    print(f"fib({i}) = {fib(i)}")`},
+
+  {name: "FizzBuzz", code: `for i in 1..31
+    if i % 15 == 0
+        print("FizzBuzz")
+    elif i % 3 == 0
+        print("Fizz")
+    elif i % 5 == 0
+        print("Buzz")
+    else
+        print(i)`},
+
+  {name: "Arrays", code: `nums := [3, 1, 4, 1, 5, 9, 2, 6]
+print(f"Original: {nums}")
+print(f"Length:   {nums.len()}")
+
+evens := nums.filter(|x| x % 2 == 0)
+print(f"Evens:    {evens}")
+
+doubled := nums.map(|x| x * 2)
+print(f"Doubled:  {doubled}")
+
+sum := nums.reduce(|a, b| a + b, 0)
+print(f"Sum:      {sum}")
+
+sorted := nums.sort()
+print(f"Sorted:   {sorted}")`},
+
+  {name: "Pattern Match", code: `fn describe(n)
+    match n
+        0 -> return "zero"
+        1 | 2 | 3 -> return "small"
+        x -> return f"big ({x})"
+
+for i in 0..6
+    print(f"{i} is {describe(i)}")`},
+
+  {name: "Structs", code: `struct Point
+    x: float
+    y: float
+
+    fn show(self) -> str
+        return f"({self.x}, {self.y})"
+
+a := Point(0.0, 0.0)
+b := Point(3.0, 4.0)
+print(f"A = {a.show()}")
+print(f"B = {b.show()}")
+
+dx := b.x - a.x
+dy := b.y - a.y
+dist := sqrt(dx * dx + dy * dy)
+print(f"Distance = {dist}")`},
+
+  {name: "Error Handling", code: `fn divide(a, b)
+    if b == 0
+        throw "division by zero!"
+    return a / b
+
+try
+    print(f"10 / 3 = {divide(10, 3)}")
+    print(f"10 / 0 = {divide(10, 0)}")
+catch e
+    print(f"Caught: {e}")
+
+print("Program continues!")`},
+
+  {name: "Pipe Operator", code: `fn double(x)
+    return x * 2
+
+fn add_ten(x)
+    return x + 10
+
+fn square(x)
+    return x * x
+
+result := 5 |> double() |> add_ten() |> square()
+print(f"5 |> double |> add_ten |> square = {result}")
+
+nums := [1, 2, 3, 4, 5]
+total := nums.map(|x| x * x).reduce(|a, b| a + b, 0)
+print(f"Sum of squares: {total}")`},
+
+  {name: "Map Type", code: `user := {name: "Lucas", age: 28, lang: "VOLT"}
+print(user)
+print(f"Name: {user.name}")
+print(f"Age:  {user.age}")
+
+user.email = "lucas@volt.dev"
+print(f"Email: {user.email}")
+print(f"Keys: {user.keys()}")
+print(f"Size: {user.len()}")`},
+];
+
+function App() {
+  const [code, setCode] = useState(EXAMPLES[0].code);
+  const [output, setOutput] = useState("");
+  const [error, setError] = useState("");
+  const [timeMs, setTimeMs] = useState(null);
+  const [details, setDetails] = useState("");
+  const [running, setRunning] = useState(false);
+  const taRef = useRef(null);
+
+  const runCode = useCallback(async () => {
+    if (running) return;
+    setRunning(true);
+    setOutput("");
+    setError("");
+    setTimeMs(null);
+    setDetails("");
+    try {
+      const res = await fetch("/api/run", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({code}),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setOutput(d.output || "(no output)");
+      } else {
+        setOutput(d.output);
+        setError(d.error);
+      }
+      setTimeMs(d.time_ms);
+      setDetails(d.details);
+    } catch {
+      setError("Connection error - is the server running?");
+    }
+    setRunning(false);
+  }, [code, running]);
+
+  useEffect(() => {
+    const h = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        runCode();
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [runCode]);
+
+  const handleTab = (e) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const t = e.target;
+      const s = t.selectionStart;
+      const end = t.selectionEnd;
+      const next = code.substring(0, s) + "    " + code.substring(end);
+      setCode(next);
+      setTimeout(() => { t.selectionStart = t.selectionEnd = s + 4; }, 0);
+    }
+  };
+
+  const loadExample = (e) => {
+    setCode(EXAMPLES[+e.target.value].code);
+    setOutput("");
+    setError("");
+    setTimeMs(null);
+    setDetails("");
+  };
+
+  const cls = running ? "output spin" : error ? "output err" : output ? "output ok" : "output idle";
+  const txt = running ? "Running..."
+    : error ? (output ? output + "\n\n" + error : error)
+    : output || "Click Run or press Ctrl+Enter";
+
+  return (
+    <div className="app">
+      <header>
+        <div className="logo"><span>{"\u26A1"}</span> VOLT Playground</div>
+        <select onChange={loadExample}>
+          {EXAMPLES.map((ex, i) => <option key={i} value={i}>{ex.name}</option>)}
+        </select>
+        <button className="run-btn" onClick={runCode} disabled={running}>
+          {running ? "\u23F3" : "\u25B6"} Run
+        </button>
+        <span className="shortcut">Ctrl + Enter</span>
+      </header>
+      <main>
+        <div className="panel">
+          <div className="panel-hdr">Editor</div>
+          <textarea
+            ref={taRef}
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            onKeyDown={handleTab}
+            spellCheck={false}
+            placeholder="Write VOLT code here..."
+            autoFocus
+          />
+        </div>
+        <div className="panel">
+          <div className="panel-hdr">Output</div>
+          <pre className={cls}>{txt}</pre>
+        </div>
+      </main>
+      <footer>
+        <span>{details || "VOLT 1.0 \u2014 Bytecode VM"}</span>
+        {timeMs !== null && <span className="timing">{"\u23F1"} {timeMs.toFixed(2)}ms</span>}
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
